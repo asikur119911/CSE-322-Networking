@@ -1,0 +1,158 @@
+# === CONFIGURATION FOR SWITCH 0 ===
+enable
+configure terminal
+vlan 10
+vlan 20
+vlan 30
+exit
+interface <port_to_PC0>
+ switchport mode access
+ switchport access vlan 10
+interface <port_to_PC1>
+ switchport mode access
+ switchport access vlan 20
+interface <port_to_PC2>
+ switchport mode access
+ switchport access vlan 30
+interface <port_to_Switch1>
+ switchport mode trunk
+exit
+
+# === CONFIGURATION FOR SWITCH 1 ===
+enable
+configure terminal
+vlan 10
+vlan 20
+vlan 30
+exit
+interface <port_to_PC3>
+ switchport mode access
+ switchport access vlan 10
+interface <port_to_PC4>
+ switchport mode access
+ switchport access vlan 20
+interface <port_to_PC5>
+ switchport mode access
+ switchport access vlan 30
+interface <port_to_Switch0>
+ switchport mode trunk
+interface <port_to_Router0>
+ switchport mode trunk
+exit
+
+# === CONFIGURATION FOR ROUTER 0 (Inter-VLAN Routing) ===
+enable
+configure terminal
+interface fa4/0
+ no shutdown
+interface fa4/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+interface fa4/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+interface fa4/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.1 255.255.255.0
+exit
+
+# === CONFIGURATION FOR ROUTER 2 (Secure Network Gateway) ===
+enable
+configure terminal
+interface fa0/0
+ ip address 192.168.100.1 255.255.255.0
+ no shutdown
+exit
+
+
+
+
+
+
+
+
+
+# === ROUTER 0 CONFIGURATION ===
+# This enables Inter-VLAN routing and routes traffic to the server via Router1
+enable
+configure terminal
+interface fa4/0
+ no shutdown
+interface fa4/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+interface fa4/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+interface fa4/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.1 255.255.255.0
+exit
+# Static route to reach the Server (10.10.10.100) via Router1's Serial interface
+# Assuming the Serial link between R0 and R1 is on a network like 172.16.1.0/30
+ip route 10.10.10.0 255.255.255.0 <Router1_Serial_IP>
+exit
+
+# === ROUTER 1 CONFIGURATION ===
+# This connects the server and routes traffic back to the PC VLANs
+enable
+configure terminal
+interface fa0/0
+ ip address 10.10.10.1 255.255.255.0
+ no shutdown
+exit
+# Static routes to reach the PC VLAN networks via Router0
+ip route 192.168.10.0 255.255.255.0 <Router0_Serial_IP>
+ip route 192.168.20.0 255.255.255.0 <Router0_Serial_IP>
+ip route 192.168.30.0 255.255.255.0 <Router0_Serial_IP>
+exit
+
+
+
+
+
+
+
+
+
+
+# === CONFIGURATION FOR ROUTER 2 ===
+enable
+configure terminal
+
+# 1. Create Extended ACL 101
+# Permit returning TCP traffic for sessions already started by the Secure Network
+access-list 101 permit tcp any 192.168.100.0 0.0.0.255 established
+
+# Deny any new TCP connection attempts initiated by internal VLANs or the Server
+access-list 101 deny tcp any 192.168.100.0 0.0.0.255
+
+# Permit all other necessary traffic (ICMP/Pings, UDP, etc.)
+access-list 101 permit ip any any
+
+# 2. Apply the ACL to the Serial interface facing the core network (Router 0)
+# This filters traffic as it enters Router 2 from the outside
+interface se2/0
+ ip access-group 101 in
+exit
+
+# 3. Ensure Routing is active so the Secure Network can find the others
+# (Replace se2/0 with the correct exit interface if different in your lab)
+ip route 192.168.10.0 255.255.255.0 se2/0
+ip route 192.168.20.0 255.255.255.0 se2/0
+ip route 192.168.30.0 255.255.255.0 se2/0
+ip route 10.10.10.0 255.255.255.0 se2/0
+
+
+
+
+
+# Map Server 0 (10.10.10.201) to Public IP 20.20.20.200
+Router1(config)# ip nat inside source static 10.10.10.201 20.20.20.200
+
+
+
+Class,IP Address Range,CIDR Prefix,Total Addresses,Common Use Case
+Class A,10.0.0.0 – 10.255.255.255,10.0.0.0/8,"16,777,216",Large enterprise networks
+Class B,172.16.0.0 – 172.31.255.255,172.16.0.0/12,"1,048,576",Medium-sized organizations
+Class C,192.168.0.0 – 192.168.255.255,192.168.0.0/16,"65,536",Home and small office (SOHO)
